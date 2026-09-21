@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Entradas y salidas · PH Red Suite</title>
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#134e4a">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{colors:{primary:'#0f766e',secondary:'#ea580c',dark:'#134e4a'}}}}</script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    :root { color-scheme: light; }
+    body { font-family: Inter, system-ui, sans-serif; }
+    .chip-in { background:#0f766e; color:#fff; }
+    .chip-out { background:#ea580c; color:#fff; }
+    .bar-airport { background:#0f766e; }
+    .bar-rosa2 { background:#c2410c; }
+    .bar-rosa3 { background:#7c3aed; }
+    .day-today { outline:2px solid #0f766e; outline-offset:-2px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <header class="bg-dark text-white sticky top-0 z-20">
+    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div>
+        <p class="text-[11px] uppercase tracking-wider text-teal-200">Uso interno · 30 días</p>
+        <h1 class="text-lg font-extrabold leading-tight">Entradas y salidas</h1>
+      </div>
+      <button id="reloadBtn" class="text-xs bg-white/10 px-3 py-2 rounded-lg">Actualizar</button>
+    </div>
+  </header>
+  <main class="max-w-lg mx-auto px-4 py-4 pb-24">
+    <p class="text-xs text-slate-500 mb-3">Airport Suite · La Rosa Costa 2 · La Rosa Costa 3. Sin nombres ni importes.</p>
+    <div class="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
+      <button data-filter="all" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-dark text-white">Todas</button>
+      <button data-filter="Airport Suite" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Airport</button>
+      <button data-filter="La Rosa Costa 2" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 2</button>
+      <button data-filter="La Rosa Costa 3" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 3</button>
+    </div>
+    <div class="flex flex-wrap gap-3 text-[11px] text-slate-600 mb-3">
+      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-airport align-middle"></i> Airport</span>
+      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-rosa2 align-middle"></i> Rosa 2</span>
+      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-rosa3 align-middle"></i> Rosa 3</span>
+      <span class="chip-in px-1.5 py-0.5 rounded text-[10px] font-bold">IN</span>
+      <span class="chip-out px-1.5 py-0.5 rounded text-[10px] font-bold">OUT</span>
+    </div>
+    <p id="meta" class="text-[11px] text-slate-400 mb-3">Cargando…</p>
+    <div id="board" class="space-y-2"></div>
+  </main>
+  <script>
+    const HOUSES = ["Airport Suite", "La Rosa Costa 2", "La Rosa Costa 3"];
+    const BAR = {"Airport Suite":"bar-airport","La Rosa Costa 2":"bar-rosa2","La Rosa Costa 3":"bar-rosa3"};
+    const SHORT = {"Airport Suite":"Airport","La Rosa Costa 2":"Rosa 2","La Rosa Costa 3":"Rosa 3"};
+    let stays = [];
+    let filter = "all";
+    const DAYS = 30;
+    const fmtDay = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "Atlantic/Canary" });
+    const ymd = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    };
+    function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+    async function load() {
+      const meta = document.getElementById("meta");
+      meta.textContent = "Cargando ocupación…";
+      let payload = null;
+      try {
+        const r = await fetch("/api/ocupacion", { cache: "no-store" });
+        if (r.ok) payload = await r.json();
+      } catch (e) {}
+      if (!payload || payload.source === "error" || !Array.isArray(payload.stays)) {
+        const r2 = await fetch("./ocupacion.json", { cache: "no-store" });
+        payload = await r2.json();
+      }
+      stays = (payload.stays || []).filter(s => HOUSES.includes(s.apartment));
+      const src = payload.source === "smoobu" ? "Smoobu en vivo" : "snapshot interno";
+      const when = payload.generated ? String(payload.generated).replace("T", " ").slice(0,16) : "";
+      meta.textContent = src + (when ? " · " + when : "") + " · " + stays.length + " estancias";
+      render();
+    }
+    function eventsFor(day) {
+      const key = ymd(day);
+      const ins = [], outs = [], occ = [];
+      for (const s of stays) {
+        if (filter !== "all" && s.apartment !== filter) continue;
+        if (s.arrival === key) ins.push(s.apartment);
+        if (s.departure === key) outs.push(s.apartment);
+        if (s.arrival < key && s.departure > key) occ.push(s.apartment);
+      }
+      return { ins, outs, occ };
+    }
+    function pill(kind, name) {
+      const cls = kind === "in" ? "chip-in" : "chip-out";
+      const label = kind === "in" ? "IN" : "OUT";
+      return `<span class="${cls} text-[11px] font-bold px-2 py-1 rounded-md">${label} ${SHORT[name]}</span>`;
+    }
+    function render() {
+      const board = document.getElementById("board");
+      const start = new Date(); start.setHours(12,0,0,0);
+      const parts = [];
+      for (let i = 0; i < DAYS; i++) {
+        const day = addDays(start, i);
+        const { ins, outs, occ } = eventsFor(day);
+        const isToday = i === 0;
+        const empty = !ins.length && !outs.length && !occ.length;
+        const occupiedSet = new Set([...occ, ...ins.filter(h => !outs.includes(h))]);
+        const bars = HOUSES.filter(h => filter === "all" || filter === h).map(h => {
+          const on = occupiedSet.has(h) || occ.includes(h) || (ins.includes(h) && !outs.includes(h));
+          const change = ins.includes(h) || outs.includes(h);
+          return `<span title="${h}" class="h-2 flex-1 rounded ${on ? BAR[h] : "bg-slate-200"} ${change ? "ring-1 ring-offset-1 ring-slate-400" : ""}"></span>`;
+        }).join("");
+        parts.push(`<article class="bg-white rounded-2xl border px-3 py-3 ${isToday ? "day-today" : ""} ${empty ? "opacity-70" : ""}"><div class="flex items-baseline justify-between gap-2"><h2 class="font-bold capitalize">${isToday ? "Hoy · " : ""}${fmtDay.format(day)}</h2><span class="text-[11px] text-slate-400">${ymd(day)}</span></div><div class="flex gap-1 mt-2 mb-2">${bars}</div><div class="flex flex-wrap gap-1.5">${outs.map(h => pill("out", h)).join("")}${ins.map(h => pill("in", h)).join("")}${empty ? '<span class="text-xs text-slate-400">Sin movimientos</span>' : ""}</div></article>`);
+      }
+      board.innerHTML = parts.join("");
+    }
+    document.querySelectorAll(".filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        filter = btn.getAttribute("data-filter");
+        document.querySelectorAll(".filter-btn").forEach(b => {
+          b.classList.toggle("bg-dark", b === btn);
+          b.classList.toggle("text-white", b === btn);
+          b.classList.toggle("bg-white", b !== btn);
+        });
+        render();
+      });
+    });
+    document.getElementById("reloadBtn").addEventListener("click", load);
+    load();
+  </script>
+</body>
+</html>

@@ -1,2 +1,2 @@
-# phrs-tablero-ops
-Tablero interno entradas/salidas Airport y La Rosa (sin datos personales)
+# Tablero entradas/salidas PHRS
+Uso interno. No enlazar desde la home.
