@@ -10,7 +10,6 @@
   <script>tailwind.config={theme:{extend:{colors:{primary:'#0f766e',secondary:'#ea580c',dark:'#134e4a'}}}}</script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    :root { color-scheme: light; }
     body { font-family: Inter, system-ui, sans-serif; }
     .chip-in { background:#0f766e; color:#fff; }
     .chip-out { background:#ea580c; color:#fff; }
@@ -25,110 +24,87 @@
     <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
       <div>
         <p class="text-[11px] uppercase tracking-wider text-teal-200">Uso interno · 30 días</p>
-        <h1 class="text-lg font-extrabold leading-tight">Entradas y salidas</h1>
+        <h1 class="text-lg font-extrabold leading-tight">Reservas · fechas</h1>
       </div>
       <button id="reloadBtn" class="text-xs bg-white/10 px-3 py-2 rounded-lg">Actualizar</button>
     </div>
   </header>
   <main class="max-w-lg mx-auto px-4 py-4 pb-24">
-    <p class="text-xs text-slate-500 mb-3">Airport Suite · La Rosa Costa 2 · La Rosa Costa 3. Sin nombres ni importes.</p>
+    <div id="summary" class="bg-white border rounded-2xl p-4 mb-4"></div>
     <div class="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
       <button data-filter="all" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-dark text-white">Todas</button>
       <button data-filter="Airport Suite" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Airport</button>
       <button data-filter="La Rosa Costa 2" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 2</button>
       <button data-filter="La Rosa Costa 3" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 3</button>
     </div>
-    <div class="flex flex-wrap gap-3 text-[11px] text-slate-600 mb-3">
-      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-airport align-middle"></i> Airport</span>
-      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-rosa2 align-middle"></i> Rosa 2</span>
-      <span><i class="inline-block w-2.5 h-2.5 rounded-sm bar-rosa3 align-middle"></i> Rosa 3</span>
-      <span class="chip-in px-1.5 py-0.5 rounded text-[10px] font-bold">IN</span>
-      <span class="chip-out px-1.5 py-0.5 rounded text-[10px] font-bold">OUT</span>
-    </div>
-    <p id="meta" class="text-[11px] text-slate-400 mb-3">Cargando…</p>
+    <h2 class="text-sm font-extrabold text-dark mt-2 mb-2">Listado de reservas</h2>
+    <div id="lista" class="space-y-2 mb-6"></div>
+    <h2 class="text-sm font-extrabold text-dark mb-2">Calendario 30 días</h2>
+    <p id="meta" class="text-[11px] text-slate-400 mb-2"></p>
     <div id="board" class="space-y-2"></div>
   </main>
   <script>
     const HOUSES = ["Airport Suite", "La Rosa Costa 2", "La Rosa Costa 3"];
     const BAR = {"Airport Suite":"bar-airport","La Rosa Costa 2":"bar-rosa2","La Rosa Costa 3":"bar-rosa3"};
     const SHORT = {"Airport Suite":"Airport","La Rosa Costa 2":"Rosa 2","La Rosa Costa 3":"Rosa 3"};
-    let stays = [];
-    let filter = "all";
-    const DAYS = 30;
+    let stays = []; let filter = "all"; const DAYS = 30;
     const fmtDay = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "Atlantic/Canary" });
-    const ymd = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return y + "-" + m + "-" + day;
-    };
-    function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+    const fmtFecha = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Atlantic/Canary" });
+    const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+    const parse = (s) => new Date(s + "T12:00:00");
+    const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+    const nights = (a, b) => Math.max(1, Math.round((parse(b) - parse(a)) / 86400000));
+    const fecha = (s) => fmtFecha.format(parse(s));
+    function windowStays() {
+      const start = ymd(new Date()); const end = ymd(addDays(new Date(), DAYS));
+      return stays.filter((s) => s.departure > start && s.arrival <= end);
+    }
+    function visible() { const list = windowStays(); return filter === "all" ? list : list.filter((s) => s.apartment === filter); }
     async function load() {
-      const meta = document.getElementById("meta");
-      meta.textContent = "Cargando ocupación…";
+      const meta = document.getElementById("meta"); meta.textContent = "Cargando…";
       let payload = null;
-      try {
-        const r = await fetch("/api/ocupacion", { cache: "no-store" });
-        if (r.ok) payload = await r.json();
-      } catch (e) {}
-      if (!payload || payload.source === "error" || !Array.isArray(payload.stays)) {
-        const r2 = await fetch("./ocupacion.json", { cache: "no-store" });
-        payload = await r2.json();
-      }
-      stays = (payload.stays || []).filter(s => HOUSES.includes(s.apartment));
-      const src = payload.source === "smoobu" ? "Smoobu en vivo" : "snapshot interno";
-      const when = payload.generated ? String(payload.generated).replace("T", " ").slice(0,16) : "";
-      meta.textContent = src + (when ? " · " + when : "") + " · " + stays.length + " estancias";
+      try { const r = await fetch("./ocupacion.json", { cache: "no-store" }); if (r.ok) payload = await r.json(); } catch (e) {}
+      stays = ((payload && payload.stays) || []).filter((s) => HOUSES.includes(s.apartment));
+      meta.textContent = "datos internos";
       render();
     }
+    function renderSummary() {
+      const list = visible(); const n = list.length; let from = null, to = null;
+      list.forEach((s) => { if (!from || s.arrival < from) from = s.arrival; if (!to || s.departure > to) to = s.departure; });
+      const counts = HOUSES.map((h) => ({ h, n: list.filter((s) => s.apartment === h).length }));
+      const rango = n ? ("del <strong>" + fecha(from) + "</strong> al <strong>" + fecha(to) + "</strong>") : "sin reservas en 30 días";
+      document.getElementById("summary").innerHTML = `<p class="text-3xl font-extrabold text-dark leading-none">${n}</p><p class="text-sm font-semibold mt-1">${n===1?"reserva":"reservas"} en los próximos 30 días</p><p class="text-sm text-slate-600 mt-1">${rango}</p><div class="grid grid-cols-3 gap-2 mt-4 text-center">${counts.map((c)=>`<div class="rounded-xl bg-slate-50 py-2"><div class="text-lg font-extrabold">${c.n}</div><div class="text-[11px] text-slate-500">${SHORT[c.h]}</div></div>`).join("")}</div>`;
+    }
+    function renderLista() {
+      const list = visible().slice().sort((a,b)=>a.arrival.localeCompare(b.arrival)||a.apartment.localeCompare(b.apartment));
+      const today = ymd(new Date());
+      if (!list.length) { document.getElementById("lista").innerHTML = '<p class="text-sm text-slate-500">No hay reservas en esta vista.</p>'; return; }
+      document.getElementById("lista").innerHTML = list.map((s,i)=>{
+        const enCurso = s.arrival <= today && s.departure > today;
+        const entraHoy = s.arrival === today; const saleHoy = s.departure === today;
+        let estado = "Próxima"; if (saleHoy) estado = "Sale hoy"; else if (entraHoy) estado = "Entra hoy"; else if (enCurso) estado = "En casa";
+        return `<article class="bg-white border rounded-2xl px-3 py-3"><div class="flex items-center justify-between gap-2"><p class="font-extrabold">${i+1}. ${SHORT[s.apartment]}</p><span class="text-[11px] font-bold px-2 py-1 rounded-full ${enCurso||entraHoy||saleHoy?"bg-teal-100 text-teal-800":"bg-slate-100 text-slate-600"}">${estado}</span></div><p class="text-base font-semibold mt-2">${fecha(s.arrival)} <span class="text-slate-400">→</span> ${fecha(s.departure)}</p><p class="text-xs text-slate-500 mt-1">Entrada ${fecha(s.arrival)} · Salida ${fecha(s.departure)} · ${nights(s.arrival,s.departure)} noches</p></article>`;
+      }).join("");
+    }
     function eventsFor(day) {
-      const key = ymd(day);
-      const ins = [], outs = [], occ = [];
-      for (const s of stays) {
-        if (filter !== "all" && s.apartment !== filter) continue;
-        if (s.arrival === key) ins.push(s.apartment);
-        if (s.departure === key) outs.push(s.apartment);
-        if (s.arrival < key && s.departure > key) occ.push(s.apartment);
+      const key = ymd(day); const list = visible(); const ins=[], outs=[], occ=[];
+      for (const s of list) { if (s.arrival===key) ins.push(s.apartment); if (s.departure===key) outs.push(s.apartment); if (s.arrival<key && s.departure>key) occ.push(s.apartment); }
+      return {ins,outs,occ};
+    }
+    function pill(kind,name){ return `<span class="${kind==="in"?"chip-in":"chip-out"} text-[11px] font-bold px-2 py-1 rounded-md">${kind==="in"?"IN":"OUT"} ${SHORT[name]}</span>`; }
+    function renderCal() {
+      const board = document.getElementById("board"); const start = new Date(); start.setHours(12,0,0,0); const parts=[];
+      for (let i=0;i<DAYS;i++){
+        const day=addDays(start,i); const {ins,outs,occ}=eventsFor(day); const isToday=i===0; const empty=!ins.length&&!outs.length&&!occ.length;
+        const occupiedSet=new Set([...occ,...ins.filter(h=>!outs.includes(h))]); const houses=filter==="all"?HOUSES:[filter];
+        const bars=houses.map(h=>`<span class="h-2 flex-1 rounded ${occupiedSet.has(h)||occ.includes(h)||(ins.includes(h)&&!outs.includes(h))?BAR[h]:"bg-slate-200"}"></span>`).join("");
+        parts.push(`<article class="bg-white rounded-2xl border px-3 py-3 ${isToday?"day-today":""} ${empty?"opacity-70":""}"><div class="flex items-baseline justify-between gap-2"><h3 class="font-bold capitalize">${isToday?"Hoy · ":""}${fmtDay.format(day)}</h3><span class="text-[11px] text-slate-400">${ymd(day)}</span></div><div class="flex gap-1 mt-2 mb-2">${bars}</div><div class="flex flex-wrap gap-1.5">${outs.map(h=>pill("out",h)).join("")}${ins.map(h=>pill("in",h)).join("")}${empty?'<span class="text-xs text-slate-400">Sin movimientos</span>':""}</div></article>`);
       }
-      return { ins, outs, occ };
+      board.innerHTML=parts.join("");
     }
-    function pill(kind, name) {
-      const cls = kind === "in" ? "chip-in" : "chip-out";
-      const label = kind === "in" ? "IN" : "OUT";
-      return `<span class="${cls} text-[11px] font-bold px-2 py-1 rounded-md">${label} ${SHORT[name]}</span>`;
-    }
-    function render() {
-      const board = document.getElementById("board");
-      const start = new Date(); start.setHours(12,0,0,0);
-      const parts = [];
-      for (let i = 0; i < DAYS; i++) {
-        const day = addDays(start, i);
-        const { ins, outs, occ } = eventsFor(day);
-        const isToday = i === 0;
-        const empty = !ins.length && !outs.length && !occ.length;
-        const occupiedSet = new Set([...occ, ...ins.filter(h => !outs.includes(h))]);
-        const bars = HOUSES.filter(h => filter === "all" || filter === h).map(h => {
-          const on = occupiedSet.has(h) || occ.includes(h) || (ins.includes(h) && !outs.includes(h));
-          const change = ins.includes(h) || outs.includes(h);
-          return `<span title="${h}" class="h-2 flex-1 rounded ${on ? BAR[h] : "bg-slate-200"} ${change ? "ring-1 ring-offset-1 ring-slate-400" : ""}"></span>`;
-        }).join("");
-        parts.push(`<article class="bg-white rounded-2xl border px-3 py-3 ${isToday ? "day-today" : ""} ${empty ? "opacity-70" : ""}"><div class="flex items-baseline justify-between gap-2"><h2 class="font-bold capitalize">${isToday ? "Hoy · " : ""}${fmtDay.format(day)}</h2><span class="text-[11px] text-slate-400">${ymd(day)}</span></div><div class="flex gap-1 mt-2 mb-2">${bars}</div><div class="flex flex-wrap gap-1.5">${outs.map(h => pill("out", h)).join("")}${ins.map(h => pill("in", h)).join("")}${empty ? '<span class="text-xs text-slate-400">Sin movimientos</span>' : ""}</div></article>`);
-      }
-      board.innerHTML = parts.join("");
-    }
-    document.querySelectorAll(".filter-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        filter = btn.getAttribute("data-filter");
-        document.querySelectorAll(".filter-btn").forEach(b => {
-          b.classList.toggle("bg-dark", b === btn);
-          b.classList.toggle("text-white", b === btn);
-          b.classList.toggle("bg-white", b !== btn);
-        });
-        render();
-      });
-    });
-    document.getElementById("reloadBtn").addEventListener("click", load);
-    load();
+    function render(){ renderSummary(); renderLista(); renderCal(); }
+    document.querySelectorAll(".filter-btn").forEach((btn)=>{ btn.addEventListener("click",()=>{ filter=btn.getAttribute("data-filter"); document.querySelectorAll(".filter-btn").forEach((b)=>{ b.classList.toggle("bg-dark", b===btn); b.classList.toggle("text-white", b===btn); b.classList.toggle("bg-white", b!==btn); }); render(); }); });
+    document.getElementById("reloadBtn").addEventListener("click", load); load();
   </script>
 </body>
 </html>
