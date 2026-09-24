@@ -3,108 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Entradas y salidas · PH Red Suite</title>
+  <title>Calendario ocupacion · PH Red Suite</title>
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="theme-color" content="#134e4a">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config={theme:{extend:{colors:{primary:'#0f766e',secondary:'#ea580c',dark:'#134e4a'}}}}</script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    body { font-family: Inter, system-ui, sans-serif; }
-    .chip-in { background:#0f766e; color:#fff; }
-    .chip-out { background:#ea580c; color:#fff; }
-    .bar-airport { background:#0f766e; }
-    .bar-rosa2 { background:#c2410c; }
-    .bar-rosa3 { background:#7c3aed; }
-    .day-today { outline:2px solid #0f766e; outline-offset:-2px; }
+    :root { --dark:#134e4a; --airport:#0f766e; --rosa2:#c2410c; --rosa3:#6d28d9; --empty:#e2e8f0; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#f8fafc; color:#1e293b; }
+    header { background:var(--dark); color:#fff; position:sticky; top:0; z-index:10; }
+    header .wrap, main { max-width:28rem; margin:0 auto; padding:.85rem 1rem; }
+    header p { margin:0; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#99f6e4; }
+    header h1 { margin:.15rem 0 0; font-size:1.15rem; }
+    .note { font-size:12px; color:#64748b; margin:0 0 12px; }
+    .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:#475569; margin-bottom:14px; }
+    .sw { width:14px; height:14px; border-radius:4px; display:inline-block; vertical-align:-2px; margin-right:4px; }
+    .sw-on { background:var(--dark); }
+    .sw-off { background:var(--empty); border:1px solid #cbd5e1; }
+    .sw-today { box-shadow:inset 0 0 0 2px var(--dark); background:#fff; }
+    .house { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:12px; margin-bottom:12px; }
+    .house-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .house h2 { margin:0; font-size:1rem; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+    .badge { font-size:11px; font-weight:800; padding:4px 8px; border-radius:999px; }
+    .badge-on { background:#d1fae5; color:#065f46; }
+    .badge-off { background:#f1f5f9; color:#64748b; }
+    .months { display:grid; gap:14px; margin-top:10px; }
+    .month-name { font-size:13px; font-weight:800; margin:0 0 6px; text-transform:capitalize; }
+    .weekdays, .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
+    .weekdays span { font-size:10px; color:#94a3b8; font-weight:700; }
+    .day { aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:var(--empty); color:#64748b; }
+    .day.out { background:transparent; color:transparent; }
+    .day.busy { color:#fff; }
+    .day.today { outline:2px solid #0f172a; outline-offset:1px; }
+    .airport .day.busy { background:var(--airport); }
+    .rosa2 .day.busy { background:var(--rosa2); }
+    .rosa3 .day.busy { background:var(--rosa3); }
+    .ranges { margin:8px 0 0; padding:0; list-style:none; font-size:12px; color:#475569; }
+    .ranges li { margin:2px 0; }
+    footer { max-width:28rem; margin:0 auto; padding:8px 16px 28px; font-size:11px; color:#94a3b8; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-  <header class="bg-dark text-white sticky top-0 z-20">
-    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
-      <div>
-        <p class="text-[11px] uppercase tracking-wider text-teal-200">Uso interno · 30 días</p>
-        <h1 class="text-lg font-extrabold leading-tight">Reservas · fechas</h1>
-      </div>
-      <button id="reloadBtn" class="text-xs bg-white/10 px-3 py-2 rounded-lg">Actualizar</button>
+<body>
+  <header>
+    <div class="wrap">
+      <p>Uso interno · dueños</p>
+      <h1>Calendario de ocupación</h1>
     </div>
   </header>
-  <main class="max-w-lg mx-auto px-4 py-4 pb-24">
-    <div id="summary" class="bg-white border rounded-2xl p-4 mb-4"></div>
-    <div class="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
-      <button data-filter="all" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-dark text-white">Todas</button>
-      <button data-filter="Airport Suite" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Airport</button>
-      <button data-filter="La Rosa Costa 2" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 2</button>
-      <button data-filter="La Rosa Costa 3" class="filter-btn shrink-0 px-3 py-2 rounded-full text-sm font-semibold bg-white border">Rosa 3</button>
+  <main>
+    <p class="note">Día de color = alquilado. Día gris = vacío. Sin nombres ni importes.</p>
+    <div class="legend">
+      <span><i class="sw sw-on"></i>Alquilado</span>
+      <span><i class="sw sw-off"></i>Vacío</span>
+      <span><i class="sw sw-today"></i>Hoy</span>
     </div>
-    <h2 class="text-sm font-extrabold text-dark mt-2 mb-2">Listado de reservas</h2>
-    <div id="lista" class="space-y-2 mb-6"></div>
-    <h2 class="text-sm font-extrabold text-dark mb-2">Calendario 30 días</h2>
-    <p id="meta" class="text-[11px] text-slate-400 mb-2"></p>
-    <div id="board" class="space-y-2"></div>
+    <div id="app">Cargando…</div>
   </main>
+  <footer id="meta"></footer>
   <script>
-    const HOUSES = ["Airport Suite", "La Rosa Costa 2", "La Rosa Costa 3"];
-    const BAR = {"Airport Suite":"bar-airport","La Rosa Costa 2":"bar-rosa2","La Rosa Costa 3":"bar-rosa3"};
-    const SHORT = {"Airport Suite":"Airport","La Rosa Costa 2":"Rosa 2","La Rosa Costa 3":"Rosa 3"};
-    let stays = []; let filter = "all"; const DAYS = 30;
-    const fmtDay = new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "Atlantic/Canary" });
-    const fmtFecha = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Atlantic/Canary" });
+    const HOUSES = [
+      { id: "Airport Suite", short: "Airport Suite", cls: "airport", color: "#0f766e" },
+      { id: "La Rosa Costa 2", short: "La Rosa Costa 2", cls: "rosa2", color: "#c2410c" },
+      { id: "La Rosa Costa 3", short: "La Rosa Costa 3", cls: "rosa3", color: "#6d28d9" }
+    ];
+    const FALLBACK = [
+      { apartment: "Airport Suite", arrival: "2026-09-14", departure: "2026-09-21" },
+      { apartment: "Airport Suite", arrival: "2026-09-22", departure: "2026-09-25" },
+      { apartment: "Airport Suite", arrival: "2026-09-25", departure: "2026-10-02" },
+      { apartment: "Airport Suite", arrival: "2026-10-04", departure: "2026-10-21" },
+      { apartment: "La Rosa Costa 2", arrival: "2026-09-18", departure: "2026-10-02" },
+      { apartment: "La Rosa Costa 2", arrival: "2026-10-06", departure: "2026-10-13" },
+      { apartment: "La Rosa Costa 3", arrival: "2026-09-15", departure: "2026-09-30" },
+      { apartment: "La Rosa Costa 3", arrival: "2026-10-01", departure: "2026-10-31" }
+    ];
+    const WEEK = ["L","M","X","J","V","S","D"];
+    const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
     const parse = (s) => new Date(s + "T12:00:00");
-    const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-    const nights = (a, b) => Math.max(1, Math.round((parse(b) - parse(a)) / 86400000));
-    const fecha = (s) => fmtFecha.format(parse(s));
-    function windowStays() {
-      const start = ymd(new Date()); const end = ymd(addDays(new Date(), DAYS));
-      return stays.filter((s) => s.departure > start && s.arrival <= end);
+    const fmt = (s) => { const d = parse(s); return String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0"); };
+    const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12); };
+    let stays = FALLBACK;
+    function occupied(house, day) {
+      const key = ymd(day);
+      return stays.some((s) => s.apartment === house && s.arrival <= key && s.departure > key);
     }
-    function visible() { const list = windowStays(); return filter === "all" ? list : list.filter((s) => s.apartment === filter); }
-    async function load() {
-      const meta = document.getElementById("meta"); meta.textContent = "Cargando…";
-      let payload = null;
-      try { const r = await fetch("./ocupacion.json", { cache: "no-store" }); if (r.ok) payload = await r.json(); } catch (e) {}
-      stays = ((payload && payload.stays) || []).filter((s) => HOUSES.includes(s.apartment));
-      meta.textContent = "datos internos";
-      render();
+    function ranges(house) {
+      const start = today();
+      const end = new Date(start.getFullYear(), start.getMonth() + 2, 0);
+      const startKey = ymd(start); const endKey = ymd(end);
+      return stays.filter((s) => s.apartment === house && s.departure > startKey && s.arrival <= endKey).sort((a,b) => a.arrival.localeCompare(b.arrival));
     }
-    function renderSummary() {
-      const list = visible(); const n = list.length; let from = null, to = null;
-      list.forEach((s) => { if (!from || s.arrival < from) from = s.arrival; if (!to || s.departure > to) to = s.departure; });
-      const counts = HOUSES.map((h) => ({ h, n: list.filter((s) => s.apartment === h).length }));
-      const rango = n ? ("del <strong>" + fecha(from) + "</strong> al <strong>" + fecha(to) + "</strong>") : "sin reservas en 30 días";
-      document.getElementById("summary").innerHTML = `<p class="text-3xl font-extrabold text-dark leading-none">${n}</p><p class="text-sm font-semibold mt-1">${n===1?"reserva":"reservas"} en los próximos 30 días</p><p class="text-sm text-slate-600 mt-1">${rango}</p><div class="grid grid-cols-3 gap-2 mt-4 text-center">${counts.map((c)=>`<div class="rounded-xl bg-slate-50 py-2"><div class="text-lg font-extrabold">${c.n}</div><div class="text-[11px] text-slate-500">${SHORT[c.h]}</div></div>`).join("")}</div>`;
-    }
-    function renderLista() {
-      const list = visible().slice().sort((a,b)=>a.arrival.localeCompare(b.arrival)||a.apartment.localeCompare(b.apartment));
-      const today = ymd(new Date());
-      if (!list.length) { document.getElementById("lista").innerHTML = '<p class="text-sm text-slate-500">No hay reservas en esta vista.</p>'; return; }
-      document.getElementById("lista").innerHTML = list.map((s,i)=>{
-        const enCurso = s.arrival <= today && s.departure > today;
-        const entraHoy = s.arrival === today; const saleHoy = s.departure === today;
-        let estado = "Próxima"; if (saleHoy) estado = "Sale hoy"; else if (entraHoy) estado = "Entra hoy"; else if (enCurso) estado = "En casa";
-        return `<article class="bg-white border rounded-2xl px-3 py-3"><div class="flex items-center justify-between gap-2"><p class="font-extrabold">${i+1}. ${SHORT[s.apartment]}</p><span class="text-[11px] font-bold px-2 py-1 rounded-full ${enCurso||entraHoy||saleHoy?"bg-teal-100 text-teal-800":"bg-slate-100 text-slate-600"}">${estado}</span></div><p class="text-base font-semibold mt-2">${fecha(s.arrival)} <span class="text-slate-400">→</span> ${fecha(s.departure)}</p><p class="text-xs text-slate-500 mt-1">Entrada ${fecha(s.arrival)} · Salida ${fecha(s.departure)} · ${nights(s.arrival,s.departure)} noches</p></article>`;
-      }).join("");
-    }
-    function eventsFor(day) {
-      const key = ymd(day); const list = visible(); const ins=[], outs=[], occ=[];
-      for (const s of list) { if (s.arrival===key) ins.push(s.apartment); if (s.departure===key) outs.push(s.apartment); if (s.arrival<key && s.departure>key) occ.push(s.apartment); }
-      return {ins,outs,occ};
-    }
-    function pill(kind,name){ return `<span class="${kind==="in"?"chip-in":"chip-out"} text-[11px] font-bold px-2 py-1 rounded-md">${kind==="in"?"IN":"OUT"} ${SHORT[name]}</span>`; }
-    function renderCal() {
-      const board = document.getElementById("board"); const start = new Date(); start.setHours(12,0,0,0); const parts=[];
-      for (let i=0;i<DAYS;i++){
-        const day=addDays(start,i); const {ins,outs,occ}=eventsFor(day); const isToday=i===0; const empty=!ins.length&&!outs.length&&!occ.length;
-        const occupiedSet=new Set([...occ,...ins.filter(h=>!outs.includes(h))]); const houses=filter==="all"?HOUSES:[filter];
-        const bars=houses.map(h=>`<span class="h-2 flex-1 rounded ${occupiedSet.has(h)||occ.includes(h)||(ins.includes(h)&&!outs.includes(h))?BAR[h]:"bg-slate-200"}"></span>`).join("");
-        parts.push(`<article class="bg-white rounded-2xl border px-3 py-3 ${isToday?"day-today":""} ${empty?"opacity-70":""}"><div class="flex items-baseline justify-between gap-2"><h3 class="font-bold capitalize">${isToday?"Hoy · ":""}${fmtDay.format(day)}</h3><span class="text-[11px] text-slate-400">${ymd(day)}</span></div><div class="flex gap-1 mt-2 mb-2">${bars}</div><div class="flex flex-wrap gap-1.5">${outs.map(h=>pill("out",h)).join("")}${ins.map(h=>pill("in",h)).join("")}${empty?'<span class="text-xs text-slate-400">Sin movimientos</span>':""}</div></article>`);
+    function monthGrid(house, year, month) {
+      const first = new Date(year, month, 1, 12);
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      let startPad = first.getDay() - 1; if (startPad < 0) startPad = 6;
+      const cells = [];
+      for (let i = 0; i < startPad; i++) cells.push('<div class="day out">.</div>');
+      const t = ymd(today());
+      for (let d = 1; d <= lastDate; d++) {
+        const date = new Date(year, month, d, 12);
+        const key = ymd(date);
+        const busy = occupied(house, date);
+        cells.push('<div class="day' + (busy ? ' busy' : '') + (key === t ? ' today' : '') + '">' + d + '</div>');
       }
-      board.innerHTML=parts.join("");
+      return '<div><p class="month-name">' + MESES[month] + ' ' + year + '</p><div class="weekdays">' + WEEK.map((w) => '<span>' + w + '</span>').join('') + '</div><div class="grid">' + cells.join('') + '</div></div>';
     }
-    function render(){ renderSummary(); renderLista(); renderCal(); }
-    document.querySelectorAll(".filter-btn").forEach((btn)=>{ btn.addEventListener("click",()=>{ filter=btn.getAttribute("data-filter"); document.querySelectorAll(".filter-btn").forEach((b)=>{ b.classList.toggle("bg-dark", b===btn); b.classList.toggle("text-white", b===btn); b.classList.toggle("bg-white", b!==btn); }); render(); }); });
-    document.getElementById("reloadBtn").addEventListener("click", load); load();
+    function render() {
+      const now = today();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      document.getElementById('app').innerHTML = HOUSES.map((h) => {
+        const on = occupied(h.id, now);
+        const list = ranges(h.id);
+        const lines = list.length ? list.map((s) => '<li>Alquilado ' + fmt(s.arrival) + ' → ' + fmt(s.departure) + '</li>').join('') : '<li>Sin reservas en estos dos meses</li>';
+        return '<section class="house ' + h.cls + '"><div class="house-top"><h2><i class="dot" style="background:' + h.color + '"></i>' + h.short + '</h2><span class="badge ' + (on ? 'badge-on' : 'badge-off') + '">' + (on ? 'Hoy alquilado' : 'Hoy vacío') + '</span></div><div class="months">' + monthGrid(h.id, now.getFullYear(), now.getMonth()) + monthGrid(h.id, next.getFullYear(), next.getMonth()) + '</div><ul class="ranges">' + lines + '</ul></section>';
+      }).join('');
+    }
+    load = async function() {
+      try {
+        const r = await fetch('./ocupacion.json', { cache: 'no-store' });
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data.stays)) stays = data.stays;
+          document.getElementById('meta').textContent = 'Datos internos · ' + (data.generated || '');
+        }
+      } catch (e) {
+        document.getElementById('meta').textContent = 'Datos internos';
+      }
+      render();
+    };
+    load();
   </script>
 </body>
 </html>
